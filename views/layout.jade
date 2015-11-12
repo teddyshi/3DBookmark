@@ -1,0 +1,26 @@
+doctype html
+html
+	head
+		title= title
+		link(rel='stylesheet', href='/stylesheets/style.css')
+		script(type='text/javascript' src='/javascripts/js/three.min.js')
+		script(type='text/javascript' src='/javascripts/js/controls/OrbitControls.js')
+		script(type='text/javascript' src='/javascripts/js/libs/HTU.js')
+		script(type='text/javascript' src='/javascripts/js/libs/babylon.2.0.js')
+		script(type='text/javascript' src='/javascripts/js/libs/jquery-1.9.1.js')
+		script(type='text/javascript' src='/javascripts/js/libs/jquery.form.min.js')
+		script(type='text/javascript' src='/javascripts/js/threex/threex.dynamictexture.js') 
+		script(type='text/javascript' src='/javascripts/fonts/gentilis_bold.typeface.js')
+		script(type='text/javascript' src='/javascripts/fonts/gentilis_regular.typeface.js') 
+		script(type='text/javascript' src='/javascripts/fonts/optimer_bold.typeface.js') 
+		script(type='text/javascript' src='/javascripts/fonts/gentilis_bold.typeface.js') 
+		script(type='text/javascript' src='/javascripts/fonts/optimer_regular.typeface.js') 
+		script(type='text/javascript' src='/javascripts/fonts/helvetiker_bold.typeface.js') 
+		script(type='text/javascript' src='/javascripts/fonts/droid/droid_sans_regular.typeface.js') 
+		script(type='text/javascript' src='/javascripts/fonts/droid/droid_sans_bold.typeface.js') 
+		script(type='text/javascript' src='/javascripts/fonts/droid/droid_serif_regular.typeface.js') 
+		script(type='text/javascript' src='/javascripts/fonts/droid/droid_serif_bold.typeface.js') 
+	body
+		block content
+		script
+			|(function(){HTU.install();HTU.animate();HTU.render();})();
