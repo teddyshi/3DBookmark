@@ -3,12 +3,14 @@ var HTU={version:'1.00'};
 HTU.originPoint = new THREE.Vector3(0,0,0);
 HTU.radius = 500;
 HTU.status = "NORMAL";//optional:NORMAL,EDIT
+HTU.SELECTEDMODE = "";
 HTU.rootGroup = new THREE.Group();
 HTU.mouse = new THREE.Vector2();
 HTU.gapBetweenCardsPosition = HTU.radius*0.01;
 HTU.cards = [];
 HTU.sortedCards = [];
 HTU.rotateGroupOperations = {
+	status:'ENDED',
 	startPosition:null,
 	endPosition:null
 };
@@ -48,6 +50,7 @@ HTU.install = function(){
 	HTU.camera.position.y = -HTU.radius*1.6;
 	HTU.raycaster = new THREE.Raycaster();
 	HTU.renderer = new THREE.WebGLRenderer();
+	HTU.renderer.setPixelRatio( window.devicePixelRatio );
 	HTU.renderer.setSize( window.innerWidth, window.innerHeight );	
 	HTU.controls = new THREE.OrbitControls( HTU.camera ,document,HTU.renderer.domElement);
 	HTU.controls.damping = 2;
@@ -59,55 +62,55 @@ HTU.install = function(){
     HTU.torus = new THREE.Mesh( HTU.torusGeometry, HTU.material );
 	HTU.rootGroup.add(HTU.torus);
 
-    //EDIT mode: create an area for user to select and drag a card.
-    HTU.dragTargetTorus = new THREE.TorusGeometry( HTU.radius, 100, 30, 1000);
+    //EDIT mode: create an area for user to select and drag/slide a card.
+    HTU.dragTargetTorus = new THREE.TorusGeometry( HTU.radius, 50, 30, 1000);
 	HTU.dragArea = new THREE.Mesh( HTU.dragTargetTorus, HTU.material );
     HTU.dragArea.visible = false;
     HTU.scene.add( HTU.dragArea );
 
-    //create an area for slide the mouse and rotate the rootGroup.
-    HTU.rotateReactor = new THREE.BoxGeometry(HTU.radius*2.5,HTU.radius*2.5,HTU.radius*2.5);
-    HTU.rotateReactorArea = new THREE.Mesh( HTU.rotateReactor, HTU.material );
-    HTU.rotateReactorArea.visible = false;
-	HTU.scene.add( HTU.rotateReactorArea);
+
     
-    
+	//During the development,maybe we need this.
+	HTU.addAssist();
+
+	//Here we add one card for example.
+    var card = HTU.addCard(HTU.CardOptions.startPosition,'SAP',{fillStyle:'blue'});
+	HTU.scene.add(card); 
+	HTU.cards.push(card);
+	HTU.rootGroup.add(card);
+
+	//Here we add some random colored cards for preview
+	for(var i=0;i<40;i++){
+		var nextPosition = HTU.availablePositionTo(HTU.cards[0],i%2==0?'ANTICLOCKWISE':'CLOCKWISE');
+	    var _card  = HTU.addCardForPreview(nextPosition,Math.random() * 0xffffff);
+		HTU.scene.add(_card);
+		HTU.cards.push(_card);
+		HTU.rootGroup.add(_card);
+	}
+
+	HTU.scene.add(HTU.rootGroup);
+
+
+	//Events
+    HTU.renderer.domElement.addEventListener( 'dblclick', HTU.onDocumentDblClick, false );
+    HTU.renderer.domElement.addEventListener( 'mousemove', HTU.onDocumentMouseMove, false );
+	HTU.renderer.domElement.addEventListener( 'mousedown', HTU.onDocumentMouseDown, false );
+	HTU.renderer.domElement.addEventListener( 'mouseup', HTU.onDocumentMouseUp, false );
+
+	//Init menu bar
+	HTU.createMenuBar();
+	HTU.ShowCardForm();
+};
+
+HTU.addAssist = function(){
     HTU.torusPlane = new THREE.Mesh(
 			new THREE.PlaneBufferGeometry( 2*HTU.radius, 2*HTU.radius, 8,8),
 			new THREE.MeshBasicMaterial( { color: 0xe8e8e8, opacity: 0.25, transparent: true } )
 		);
     HTU.torusPlane.visible = true;
     HTU.scene.add(HTU.torusPlane);
-
-    var card = HTU.addCard(HTU.CardOptions.startPosition,'SAP',{fillStyle:'blue'});
-	HTU.scene.add(card); 
-	HTU.cards.push(card);
-	HTU.rootGroup.add(card);
-
-	var nextPosition = HTU.availablePositionTo(HTU.cards[0],'ANTICLOCKWISE');
-    var card2  = HTU.createPreviewCard(nextPosition);
-	HTU.scene.add(card2);
-	HTU.cards.push(card2);
-	HTU.rootGroup.add(card2);
-	HTU.scene.add(HTU.rootGroup);
-	// var textOpts = {
-	// 		row1:{text:'title',color:'red'},
-	// 		row2:{text:'subtitle',color:'blue'},
-	// 		row3:{text:'content',color:'yellow'}
-	// 	// var itemText1 = new HTU.TextGroup(new THREE.Vector3(0,-radius, 0),textOpts);
-	// scene.add(itemText1); 
-	// objects.push(itemText1);
-	
     var helper = new THREE.GridHelper( HTU.radius*2, 50 );
     HTU.scene.add( helper );
-    HTU.renderer.domElement.addEventListener( 'dblclick', HTU.onDocumentDblClick, false );
-    HTU.renderer.domElement.addEventListener( 'mousemove', HTU.onDocumentMouseMove, false );
-	HTU.renderer.domElement.addEventListener( 'mousedown', HTU.onDocumentMouseDown, false );
-	HTU.renderer.domElement.addEventListener( 'mouseup', HTU.onDocumentMouseUp, false );
-
-	//initializing menu bar
-	HTU.createMenuBar();
-	HTU.ShowCardForm();
 };
 
 HTU.Card=function(options){
@@ -153,7 +156,6 @@ HTU.addCard = function(position,text,color){
 				type:'TEXT',
 				text:text,
 				textColor:color
-				// ,
 				// textAreaWidth:HTU.CardOptions.textAreaWidth,
 				// textAreaHeight:HTU.CardOptions.textAreaHeight
 			}
@@ -161,7 +163,7 @@ HTU.addCard = function(position,text,color){
 };
 
 
-HTU.glideCard = function(angle,direction){
+HTU.rotateCardsAroundOriginPoint = function(angle,direction){
 	var _direction = null;
 	if(direction===undefined||direction===null||typeof direction!='string'){
 		_direction = 'ANTICLOCKWISE';
@@ -183,19 +185,16 @@ HTU.glideCard = function(angle,direction){
 	HTU.renderer.render( HTU.scene, HTU.camera );
 };
 
-HTU.glideAll = function(){
-
-};
-
-
 //Handle the dragging event on one card.
 //With this feature user can drag and put a card to a new position.
 HTU.singleDrag = function(){	
-	if ( HTU.SELECTED ) {
+	if ( HTU.SELECTED!=null) {
+		HTU.mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+		HTU.mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 		HTU.raycaster.setFromCamera( HTU.mouse, HTU.camera );
 		var intersects = HTU.raycaster.intersectObject( HTU.dragArea,true);
 		if(intersects.length>0){
-		var intersectPos = intersects[ 0 ].point;
+			var intersectPos = intersects[ 0 ].point;
 			if(HTU.SELECTED.group){
 				HTU.SELECTED.group.position.copy(intersectPos);
 			}else{
@@ -205,8 +204,10 @@ HTU.singleDrag = function(){
 		HTU.render();
 		return;
 	}
-	//If nothing selected then try to select some thing.
-	HTU.selectObject();
+	//If do not do this step,the selected object maybe lost.
+	//Because your mouse could move faster than the target object.
+	//If that happens,the raycaster could not get the intersection.
+	HTU.selectObjectWhenMouseMoving();
 };
 
 
@@ -216,7 +217,6 @@ HTU.TextGroup=function(position,textContent){//unfinished
 	group.position = position;
 	if(textContent.row1!=null){
 		textRow1 = new HTU.Text(group,position,textContent.row1.text,1,textContent.row1.color);
-		console.log(textRow1.fillStyle);
 		group.add(textRow1);
 	}
 	if(textContent.row2!=null){
@@ -235,7 +235,6 @@ HTU.onDocumentMouseDown = function( event ) {
 	HTU.mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
 	HTU.mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 	var vector = new THREE.Vector3( HTU.mouse.x, HTU.mouse.y, 0.5 ).unproject( HTU.camera );
-	//var raycaster = new THREE.Raycaster( HTU.camera.position, vector.sub( HTU.camera.position ).normalize() );
 	HTU.raycaster.setFromCamera( HTU.mouse, HTU.camera );
 	var intersects = HTU.raycaster.intersectObjects( HTU.cards,true );
 	if ( intersects.length > 0 ) {
@@ -243,57 +242,99 @@ HTU.onDocumentMouseDown = function( event ) {
 		HTU.SELECTED = intersects[0].object;
 		HTU.container.css('cursor', 'move');
 	}
+	if(HTU.status==="EDIT"){
+		HTU.SELECTEDMODE='FOR_EDIT';
+		return;
+	}
 	if(HTU.status==="NORMAL"){
-		HTU.rotateGroupOperations.startPosition = HTU.getPointFromRotateReactor();
+		HTU.rotateGroupOperations.startPosition = HTU.getPointFromReactiveArea();
+		HTU.SELECTEDMODE='FOR_ROTATION';
+		HTU.rotateGroupOperations.status='STARTED';
 		return;
 	}
 };
 
-HTU.getPointFromRotateReactor = function(){
+HTU.getPointFromReactiveArea = function(){
 	HTU.raycaster.setFromCamera( HTU.mouse, HTU.camera );
-	var intersects = HTU.raycaster.intersectObject(HTU.rotateReactorArea,true );
+	var intersects = HTU.raycaster.intersectObject(HTU.dragArea,true );
 	if(intersects.length>0){
 		return intersects[0].point;
 	}else{
-		console.log('Please click and drag your mouse near the cards.');
-		return undefined;
+		console.log('Please select a card then you can rotate the whole world.');
+		return null;
 	}
 };
-
 
 HTU.onDocumentMouseMove = function( event ) {
-	event.preventDefault();
-	HTU.mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
-	HTU.mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
-	if(HTU.status==="NORMAL"){
-		HTU.selectObject();
-		HTU.rotateGroupByAngle();
-	}
 	if(HTU.status==="EDIT"){
 		HTU.singleDrag();
+	}else{
+		if(HTU.status==="NORMAL"&&HTU.SELECTEDMODE==='FOR_ROTATION'&&HTU.SELECTED!=null&&HTU.SELECTED!=undefined){
+			if(HTU.rotateGroupOperations.status==='STARTED'){
+				HTU.selectObjectWhenMouseMoving();
+				HTU.rotateAllCards();
+			}
+		}
 	}
 };
 
-HTU.rotateGroupByAngle = function(){
+HTU.rotateAllCards = function(){
 	var startPointOnTorus = HTU.getProjectionPointOnTorus(HTU.rotateGroupOperations.startPosition);
-	HTU.rotateGroupOperations.endPosition = HTU.getPointFromRotateReactor();
+	HTU.rotateGroupOperations.endPosition = HTU.getPointFromReactiveArea();
 	var nowPointOnTorus = HTU.getProjectionPointOnTorus(HTU.rotateGroupOperations.endPosition);
+	if(startPointOnTorus===null||startPointOnTorus===undefined||nowPointOnTorus===null||nowPointOnTorus===undefined){
+		return;
+	}
 	var angle = startPointOnTorus.angleTo(nowPointOnTorus);
-	
+	var currentDirectionOfMovement = HTU.getDirectionForRotation(startPointOnTorus,nowPointOnTorus);
+	HTU.rotateCardsAroundOriginPoint(angle,currentDirectionOfMovement);
 };
 
-HTU.directionJduge = function(startPoint,endPoint){
+HTU.getDirectionForRotation = function(startPoint,endPoint){
 	var direction = '';
 	var xDiff = endPoint.x - startPoint.x;
 	var yDiff = endPoint.y - startPoint.y;
-	if(xDiff>0&&yDiff<0){
-		direction='ANTICLOCKWISE';
-	}
-	if(xDiff<0&&)
 
+	var directionWhenAcrossingQuadrant = HTU.getDirectionInCaseQuadrantAcrossed(startPoint,endPoint);
+	if(directionWhenAcrossingQuadrant!=null){
+		return directionWhenAcrossingQuadrant;
+	}	
+	if(endPoint.x>0&&endPoint.y>0){
+		direction=(xDiff>0&&yDiff<0)?'CLOCKWISE':'ANTICLOCKWISE';
+	}
+	if(endPoint.x<0&&endPoint.y>0){
+		direction=(xDiff>0&&yDiff>0)?'CLOCKWISE':'ANTICLOCKWISE';
+	}
+	if(endPoint.x<0&&endPoint.y<0){
+		direction=(xDiff<0&&yDiff>0)?'CLOCKWISE':'ANTICLOCKWISE';
+	}
+	if(endPoint.x>0&&endPoint.y<0){
+		direction=(xDiff<0&&yDiff<0)?'CLOCKWISE':'ANTICLOCKWISE';
+	}
+	return direction;
 };
 
+HTU.getDirectionInCaseQuadrantAcrossed = function(startPoint,endPoint){
+	if(startPoint.x<0&&endPoint.x>0){
+		return startPoint.y>0&&endPoint.y>0?'CLOCKWISE':'ANTICLOCKWISE';
+	}
+	if(startPoint.x>0&&endPoint.x<0){
+		return startPoint.y>0&&endPoint.y>0?'ANTICLOCKWISE':'CLOCKWISE';
+	}
+	if(startPoint.y<0&&endPoint.y>0){
+		return startPoint.x>0&&endPoint.x>0?'ANTICLOCKWISE':'CLOCKWISE';
+	}
+	if(startPoint.y<0&&endPoint.y>0){
+		return startPoint.x>0&&endPoint.x>0?'CLOCKWISE':'ANTICLOCKWISE';
+	}	
+	return null;
+};
+
+
 HTU.getProjectionPointOnTorus = function(position){
+	if(undefined===position||position===null){
+		return;
+	}
 	var projectionOnPlane = new THREE.Vector3(position.x,position.y,0);
 	var distanceToOrigin = projectionOnPlane.distanceTo(HTU.originPoint);
 	var rate = distanceToOrigin/HTU.radius;
@@ -302,9 +343,12 @@ HTU.getProjectionPointOnTorus = function(position){
 	return new THREE.Vector3(xOnTorus,yOnTorus,0);
 };
 
-HTU.selectObject = function(){
+HTU.selectObjectWhenMouseMoving= function(){
+	event.preventDefault();
+	HTU.mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+	HTU.mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 	HTU.raycaster.setFromCamera( HTU.mouse, HTU.camera );
-	var intersects = HTU.raycaster.intersectObjects( HTU.cards ,true);
+	var intersects = HTU.raycaster.intersectObjects( HTU.cards ,false);
 	if ( intersects.length > 0 ) {
 		if ( HTU.INTERSECTED != intersects[ 0 ].object ) {
 			HTU.INTERSECTED = intersects[ 0 ].object;
@@ -314,11 +358,13 @@ HTU.selectObject = function(){
 		HTU.INTERSECTED = null;
 		HTU.container.css('cursor', 'auto');
 	}
+	return HTU.INTERSECTED!=null;
 };
 
 
 
 HTU.clearRotateGroupOperations = function(){
+	HTU.rotateGroupOperations.status = 'ENDED';
 	HTU.rotateGroupOperations.startPosition = null;
 	HTU.rotateGroupOperations.endPosition = null;
 };
@@ -326,20 +372,9 @@ HTU.clearRotateGroupOperations = function(){
 
 HTU.onDocumentMouseUp = function( event ) {
 	if(HTU.status==="NORMAL"){
-		console.log('on mouse up...');
 		event.preventDefault();
 		HTU.controls.enabled = true;
-		HTU.rotateGroupOperations.endPosition = HTU.getPointFromRotateReactor();
-		console.log(HTU.rotateGroupOperations.startPosition);
-		console.log(HTU.rotateGroupOperations.endPosition);
-		var _distance = HTU.rotateGroupOperations.endPosition.distanceTo(HTU.rotateGroupOperations.startPosition);
-		console.log('_distance:'+_distance);
-		if(_distance>2){
-			console.log('rotating...');
-		}else{
-			HTU.clearRotateGroupOperations();
-		}
-		return;
+		HTU.clearRotateGroupOperations();
 	}else{
 		event.preventDefault();
 		HTU.controls.enabled = true;
@@ -351,23 +386,18 @@ HTU.onDocumentMouseUp = function( event ) {
 			HTU.render();
 		}
 	}
-	if ( HTU.INTERSECTED ) {
-		HTU.SELECTED = null;
-	}
+	HTU.SELECTED = null;
 	HTU.container.css('cusor','auto');
-	HTU.printPosition(HTU.cards[1]);
 };
 
 HTU.onDocumentDblClick = function( event ){
 		alert('dbclick');
 };
 
-
+//Maybe need to be destroyed
 HTU.Text = function(group,_position,textContent,rowNumber,textColor){//unfinished
-	console.log("group===>"+group);
 	var textGeo = new THREE.TextGeometry(textContent,HTU.DefaultText);
 	var rs = new THREE.Mesh(textGeo,new THREE.MeshBasicMaterial({color: textColor}));
-	console.log(rs.font);
 	rs.position.x = _position.x;
 	rs.position.y = _position.y;
 	rs.position.z = _position.z;
@@ -403,46 +433,6 @@ HTU.isPositionCollision = function(position,objects,distance){
 	return false;
 };
 
-
-// HTU.collisionDetect = function(object,objects){
-// 	var lineLength = HTU.CardOptions.width*0.5;
-// 	console.log("objectID:"+object.id);
-// 	HTU.printPosition(object);
-// 	HTU.printPosition(objects[0]);
-// 	var raycasterArray = [
-// 		new THREE.Raycaster(object.position,new THREE.Vector3( 1, 0, 0)),
-// 		new THREE.Raycaster(object.position,new THREE.Vector3( 0,-1, 0)),
-// 		new THREE.Raycaster(object.position,new THREE.Vector3( 1,-1, 0)),
-// 		new THREE.Raycaster(object.position,new THREE.Vector3( 1, 1, 0)),
-// 		new THREE.Raycaster(object.position,new THREE.Vector3( 0, 1, 0)),
-// 		new THREE.Raycaster(object.position,new THREE.Vector3(-1, 1, 0)),
-// 		new THREE.Raycaster(object.position,new THREE.Vector3(-1, 0, 0)),
-// 		new THREE.Raycaster(object.position,new THREE.Vector3(-1,-1, 0))
-// 	];
-// 	for(var i =0;i<raycasterArray.length;i++){
-// 		var intersections = raycasterArray[i].intersectObjects(objects);
-// 		console.log(i+'-intersection length:'+intersections.length);
-// 		if(intersections.length>0){
-// 			HTU.printPosition(intersections[0]);
-// 			HTU.printPosition(intersections[1]);
-// 			console.log("distance:"+intersections[0].distance);
-// 			return true;
-// 		}
-// 	}
-// 	return false;
-// };
-
-HTU.printPosition = function(object){
-	if(!object){
-		return;
-	}
-	if(object.position){
-		console.log("["+object.id+":"+object.position.x+","+object.position.y+","+object.position.z+"]");
-	}else{
-		console.log("["+object.object.id+":"+object.object.position.x+","+object.object.position.y+","+object.object.position.z+"]");
-	}	
-}
-
 HTU.animate = function() {
 	requestAnimationFrame(HTU.animate);
 	HTU.controls.update();
@@ -458,8 +448,8 @@ HTU.createMenuBar = function(){
 	HTU.menuBar.addClass('menuBar');
 	HTU.menuBar.childrenItem = new Array();
 	HTU.container.append(HTU.menuBar);
-	HTU.createMenuItem(0,'create_card','Create Card',function(){console.log('creating.. card');});	
-	HTU.createMenuItem(1,'remove_card','Remove Card',function(){console.log('removing.. card');});
+	HTU.createMenuItem(0,'create_card','Create Card',function(){});	
+	HTU.createMenuItem(1,'remove_card','Remove Card',function(){});
 };
 
 HTU.createMenuItem = function(index,name,label,fn){
@@ -500,7 +490,7 @@ HTU.ShowCardForm = function(data){
 				return;
 			}
 			var imageUrlOnServer = response.path;
-				console.log('Success, file uploaded to:' + imageUrlOnServer);
+				//console.log('Success, file uploaded to:' + imageUrlOnServer);
 				$('<img/>').attr('src', imageUrlOnServer).appendTo(cardContentDiv);
 			}
 		});
@@ -519,7 +509,7 @@ HTU.testSaveCard = function(){
 			data: { a: "John", b: "Boston" },
 			method:'post'
 		}).done(function(data){
-			console.log('after ajax:'+data);
+			//console.log('after ajax:'+data);
 		});
 };
 
@@ -530,7 +520,7 @@ HTU.testUpload = function(){
 			data: { a: "John", b: "Boston" },
 			method:'post'
 		}).done(function(data){
-			console.log('after ajax:'+data);
+			//console.log('after ajax:'+data);
 		});
 };
 
@@ -589,7 +579,7 @@ HTU.afterMovingShortDistance = function(position,direction){
 	return p;
 };
 
-HTU.createPreviewCard = function(position){
+HTU.addCardForPreview = function(position,color){
 	return HTU.Card(
 			{
 				position:position,
@@ -598,32 +588,29 @@ HTU.createPreviewCard = function(position){
 				depth:HTU.CardOptions.depth,
 				type:'DYNAMIC',
 				meshBasicMaterial:new THREE.MeshBasicMaterial({
-					color: 0x4EC83B
+					color: color?color:0X4EC83B
 				})
 			}
 	);
 };
 
 
-HTU.RotateAllStuffs = function(originPoint,radius,existedObjects,xDistance){
-	
-};
 
 
 
-//backlogs:---->
-//build stage - implemented
-//select - implemented
-//drag - implemented
+//backlogs list:---->
+//build stage - done
+//select - done
+//drag - done
 //swap - 
 //fold - 
 //browsing / edit mode
-//rotate all stuffs when mouse moving
+//rotate the whole world by moving mouse - done
 //auto browsing - no idea
 //free creation - allow user to upload their own pictures,writing down text.And finally put the new item box on the torus.
 //remove ,edit
 //free js embed ,event controlling
-//position adjusting, avoiding the conflicts of the positions (two objects might have the same position in the same time).碰撞检测
+//position adjusting, avoiding the conflicts of the positions (two objects might have the same position in the same time).
 //add fog -
 //decorate(lighting,filtering) - 
 //backlogs end:------>
