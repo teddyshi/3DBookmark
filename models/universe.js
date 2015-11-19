@@ -1,8 +1,7 @@
 var mongoose = require('mongoose');
 var ObjectId = mongoose.Schema.Types.ObjectId;
 
-var universeSchema = new Schema({
-	_id: ObjectId,
+var universeSchema = new mongoose.Schema({
 	name: String,
 	ownerId: ObjectId,
 	galaxies: [{
@@ -10,13 +9,13 @@ var universeSchema = new Schema({
 		name: String,
 		cards: [{
 			_id: ObjectId,
-			name: String,
+			title: String,
 			link: String,
 			coordX: Number,
 			coordY: Number,
 			width: Number,
 			height: Number,
-			thickness: Number,
+			thickness: Number
 		}]
 	}]
 });

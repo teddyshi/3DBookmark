@@ -12,6 +12,15 @@ var users = require('./routes/users');
 var upload = require('./routes/upload');
 var domain = require('./routes/domain');
 
+var config = require('./config/config.json');
+var env = process.env.NODE_ENV || "development";
+var use_db = process.env.USE_DB;
+if('true' === use_db) {
+  var mongoose = require('mongoose');
+  var connection = "mongodb://"+config[env].dbhost+"/"+config[env].dbname;
+  mongoose.connect(connection);
+}
+
 var app = express();
 
 // view engine setup

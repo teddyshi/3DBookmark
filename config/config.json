@@ -1,0 +1,20 @@
+{
+  "development": {
+    "username": "",
+    "password": "",
+    "dbname": "bookmark",
+    "dbhost": "localhost"
+  },
+  "test": {
+    "username": "",
+    "password": "",
+    "dbname": "bookmark",
+    "dbhost": "localhost"
+  },
+  "production": {
+    "username": "",
+    "password": "",
+    "dbname": "bookmark",
+    "dbhost": "localhost"
+  }
+}
