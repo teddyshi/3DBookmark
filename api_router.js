@@ -6,8 +6,8 @@ var galaxy = require('./api/galaxy.js');
 var universe = require('./api/universe.js');
 
 router.post('/user', user.create);
-router.post('/card', post.create);
-router.put('/card', post.update)
+router.post('/card', card.create);
+router.put('/card', card.update)
 router.post('/galaxy', galaxy.create);
 router.post('/universe', universe.create);
 
