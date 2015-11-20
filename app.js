@@ -12,6 +12,8 @@ var users = require('./routes/users');
 var upload = require('./routes/upload');
 var domain = require('./routes/domain');
 
+var apiRouter = require('./api_router');
+
 var config = require('./config/config.json');
 var env = process.env.NODE_ENV || "development";
 var use_db = process.env.USE_DB;
@@ -34,6 +36,8 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.use('/api', apiRouter);
 
 app.use('/', routes);
 app.use('/users', users);
