@@ -1,4 +1,4 @@
-var galaxyService = require('./services/galaxyService');
+var galaxyService = require('../services/galaxyService');
 
 exports.create = function(req, res, next) {
 	var newGalaxy = req.body;
@@ -6,5 +6,5 @@ exports.create = function(req, res, next) {
 		.then(function(createRes) {
 			res.status(201)
 				.json({});
-		})
+		});
 }

@@ -1,4 +1,4 @@
-var universeService = require('./services/universeService');
+var universeService = require('../services/universeService');
 
 exports.create = function(req, res, next) {
 	var newUniverse = req.body;
@@ -6,5 +6,5 @@ exports.create = function(req, res, next) {
 		.then(function(createRes) {
 			res.status(201)
 				.json({});
-		})
+		});
 }
